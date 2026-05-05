@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Corte Smart — Sistema de Corte Automatizado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg0: #0a0c0e;
+    --bg1: #0f1215;
+    --bg2: #141820;
+    --bg3: #1c2330;
+    --panel: #111620;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --amber: #f5a623;
+    --amber2: #ffc34d;
+    --amber-dim: rgba(245,166,35,0.12);
+    --green: #32d47a;
+    --green-dim: rgba(50,212,122,0.12);
+    --red: #f04f5e;
+    --red-dim: rgba(240,79,94,0.13);
+    --blue: #4a90e2;
+    --blue-dim: rgba(74,144,226,0.12);
+    --text: #dce2ec;
+    --text2: #7f8fa8;
+    --text3: #4a5568;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Barlow', sans-serif;
+    --cond: 'Barlow Condensed', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; }
+  body {
+    background: var(--bg0);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scan line overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--bg1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--amber);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #000;
+    font-family: var(--mono);
+    flex-shrink: 0;
+  }
+  .logo-text {
+    font-family: var(--cond);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--text);
+  }
+  .logo-text span { color: var(--amber); }
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+  .status-pill.online {
+    color: var(--green);
+    border-color: rgba(50,212,122,0.3);
+    background: var(--green-dim);
+  }
+  .status-pill.offline {
+    color: var(--red);
+    border-color: rgba(240,79,94,0.3);
+    background: var(--red-dim);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse-dot 1.5s ease infinite;
+  }
+  .status-pill.offline .status-dot { animation: none; }
+  @keyframes pulse-dot {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .conn-btn {
+    background: none;
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+  .conn-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+  /* ── Nav tabs ── */
+  .nav {
+    background: var(--bg1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav-tab {
+    font-family: var(--cond);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 12px 18px;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+  }
+  .nav-tab:hover { color: var(--text2); }
+  .nav-tab.active {
+    color: var(--amber);
+    border-bottom-color: var(--amber);
+  }
+
+  /* ── Layout ── */
+  .main {
+    padding: 20px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Grid layouts ── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .col-span-2 { grid-column: span 2; }
+  .col-span-3 { grid-column: span 3; }
+
+  /* ── Panel (card) ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-title {
+    font-family: var(--cond);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text2);
+  }
+  .panel-body { padding: 16px; }
+
+  /* ── Metric cards ── */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .metric {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .metric::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .metric.amber::before { background: var(--amber); }
+  .metric.green::before { background: var(--green); }
+  .metric.blue::before { background: var(--blue); }
+  .metric.red::before { background: var(--red); }
+  .metric-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .metric-value {
+    font-family: var(--mono);
+    font-size: 26px;
+    color: var(--text);
+    line-height: 1;
+  }
+  .metric-unit {
+    font-size: 11px;
+    color: var(--text3);
+    margin-left: 3px;
+  }
+
+  /* ── Control inputs ── */
+  .field { margin-bottom: 16px; }
+  .field-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .field-input {
+    width: 100%;
+    background: var(--bg0);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 16px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field-input:focus { border-color: var(--amber); }
+  .field-input::-webkit-inner-spin-button { opacity: 0.5; }
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--bg0);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .stepper-btn {
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 20px;
+    width: 44px; height: 44px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--mono);
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .stepper-btn:hover { background: var(--bg2); color: var(--amber); }
+  .stepper-val {
+    flex: 1;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 18px;
+    color: var(--text);
+    background: none;
+    border: none;
+    outline: none;
+    padding: 0 8px;
+  }
+  .stepper-unit {
+    font-size: 11px;
+    color: var(--text3);
+    padding-right: 12px;
+    font-family: var(--mono);
+  }
+
+  /* ── Slider ── */
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--amber);
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: var(--cond);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 12px 24px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-primary {
+    background: var(--amber);
+    color: #000;
+  }
+  .btn-primary:hover { background: var(--amber2); transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { background: var(--text3); color: var(--bg2); cursor: not-allowed; transform: none; }
+  .btn-danger {
+    background: var(--red);
+    color: #fff;
+    font-size: 15px;
+  }
+  .btn-danger:hover { background: #ff6370; transform: translateY(-1px); }
+  .btn-stop {
+    background: var(--bg2);
+    color: var(--text2);
+    border: 1px solid var(--border2);
+  }
+  .btn-stop:hover { border-color: var(--red); color: var(--red); }
+  .btn-ghost {
+    background: none;
+    color: var(--text2);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+  .btn-block { width: 100%; justify-content: center; }
+
+  /* ── Progress ── */
+  .progress-wrap {
+    background: var(--bg0);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    height: 20px;
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--amber) 0%, var(--amber2) 100%);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-bar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+    animation: shimmer 1.5s linear infinite;
+  }
+  @keyframes shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
+  .progress-bar.paused::after { display: none; }
+  .progress-label {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text2);
+    z-index: 1;
+  }
+
+  /* ── Machine viz ── */
+  .machine-viz {
+    background: var(--bg0);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+    position: relative;
+    overflow: hidden;
+  }
+  .machine-viz svg { width: 100%; max-width: 400px; }
+
+  /* ── Status indicator ── */
+  .status-big {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .status-orb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-orb.idle { background: var(--text3); }
+  .status-orb.running {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse-orb 0.8s ease infinite;
+  }
+  .status-orb.stopped { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .status-orb.done { background: var(--blue); box-shadow: 0 0 8px var(--blue); }
+  @keyframes pulse-orb {
+    0%,100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.7; }
+  }
+  .status-text {
+    font-family: var(--cond);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .status-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+  }
+
+  /* ── Log ── */
+  .log-area {
+    background: var(--bg0);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    max-height: 150px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .log-area::-webkit-scrollbar { width: 4px; }
+  .log-area::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .log-entry { line-height: 1.8; }
+  .log-entry .ts { color: var(--text3); }
+  .log-entry .msg { color: var(--text2); }
+  .log-entry.ok .msg { color: var(--green); }
+  .log-entry.warn .msg { color: var(--amber); }
+  .log-entry.err .msg { color: var(--red); }
+
+  /* ── Recipes ── */
+  .recipe-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .recipe-card:hover { border-color: var(--amber); background: var(--amber-dim); }
+  .recipe-name {
+    font-family: var(--cond);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .recipe-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .recipe-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: var(--amber-dim);
+    color: var(--amber);
+    border: 1px solid rgba(245,166,35,0.25);
+  }
+
+  /* ── Emergency button ── */
+  .emergency-btn {
+    background: var(--red-dim);
+    border: 2px solid var(--red);
+    color: var(--red);
+    font-family: var(--cond);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 16px 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .emergency-btn:hover {
+    background: var(--red);
+    color: #fff;
+    transform: scale(1.02);
+  }
+  .emergency-btn:active { transform: scale(0.98); }
+
+  /* ── Sensor grid ── */
+  .sensor-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .sensor-item {
+    background: var(--bg0);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sensor-name {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .sensor-val {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .sensor-val.ok { color: var(--green); }
+  .sensor-val.warn { color: var(--amber); }
+  .sensor-val.err { color: var(--red); }
+
+  /* ── Toggle switch ── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label {
+    font-size: 13px;
+    color: var(--text2);
+  }
+  .toggle {
+    position: relative;
+    width: 40px; height: 22px;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    background: var(--bg0);
+    border: 1px solid var(--border2);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .toggle input:checked + .toggle-track { background: var(--amber); border-color: var(--amber); }
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--text2);
+    transition: 0.2s;
+  }
+  .toggle input:checked + .toggle-track::after {
+    transform: translateX(18px);
+    background: #000;
+  }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+  .section-gap { margin-bottom: 16px; }
+
+  /* ── Charts (CSS only) ── */
+  .bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 80px;
+    padding: 0 4px;
+  }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bar { width: 100%; background: var(--amber-dim); border-radius: 3px 3px 0 0; border: 1px solid rgba(245,166,35,0.2); transition: height 0.5s ease; }
+  .bar.active { background: linear-gradient(180deg, var(--amber2) 0%, var(--amber) 100%); border-color: var(--amber); }
+  .bar-lbl { font-family: var(--mono); font-size: 9px; color: var(--text3); }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .metric-grid { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: 1fr; }
+    .col-span-2 { grid-column: span 1; }
+    .col-span-3 { grid-column: span 1; }
+  }
+  @media (max-width: 640px) {
+    .main { padding: 12px; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .metric-grid { grid-template-columns: repeat(2, 1fr); }
+    .logo-text { font-size: 15px; }
+    .metric-value { font-size: 22px; }
+    .sensor-grid { grid-template-columns: 1fr; }
+    .header { padding: 0 14px; }
+    .nav { padding: 0 10px; }
+  }
+  @media (max-width: 360px) {
+    .metric-grid { grid-template-columns: 1fr 1fr; }
+    .metric-value { font-size: 18px; }
+  }
+
+  /* ── Blinking cursor ── */
+  .cursor::after {
+    content: '▋';
+    animation: blink 1s step-end infinite;
+    color: var(--amber);
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── Tape animation ── */
+  @keyframes tape-move {
+    from { transform: translateX(0); }
+    to { transform: translateX(-40px); }
+  }
+  .tape-running { animation: tape-move 0.5s linear infinite; }
+
+  /* connection modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal-backdrop.hidden { display: none; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 24px;
+    width: 100%; max-width: 360px;
+  }
+  .modal-title {
+    font-family: var(--cond);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  /* Toast */
+  .toast-container {
+    position: fixed;
+    bottom: 20px; right: 20px;
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .toast {
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-left: 3px solid var(--amber);
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    max-width: 260px;
+    animation: toast-in 0.3s ease;
+  }
+  .toast.ok { border-left-color: var(--green); }
+  .toast.err { border-left-color: var(--red); }
+  @keyframes toast-in {
+    from { transform: translateX(40px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">CC</div>
+    <span class="logo-text">CORTE<span>SMART</span></span>
+  </div>
+  <div class="header-status">
+    <div class="status-pill" id="connStatus">
+      <div class="status-dot"></div>
+      <span id="connLabel">OFFLINE</span>
+    </div>
+    <button class="conn-btn" onclick="openConnModal()">CONECTAR</button>
+  </div>
+</header>
+
+<!-- Nav -->
+<nav class="nav">
+  <button class="nav-tab active" onclick="showPage('ctrl', this)">Controle</button>
+  <button class="nav-tab" onclick="showPage('dash', this)">Dashboard</button>
+  <button class="nav-tab" onclick="showPage('recipes', this)">Receitas</button>
+  <button class="nav-tab" onclick="showPage('config', this)">Configuração</button>
+</nav>
+
+<!-- ══════════ PAGE: CONTROLE ══════════ -->
+<main class="main">
+<div id="ctrl" class="page active">
+  <div class="metric-grid">
+    <div class="metric amber">
+      <div class="metric-label">COMPRIMENTO</div>
+      <div class="metric-value" id="mLen">1.50<span class="metric-unit">m</span></div>
+    </div>
+    <div class="metric green">
+      <div class="metric-label">QUANTIDADE</div>
+      <div class="metric-value" id="mQty">10<span class="metric-unit">pç</span></div>
+    </div>
+    <div class="metric blue">
+      <div class="metric-label">PROGRESSO</div>
+      <div class="metric-value" id="mProg">0<span class="metric-unit">/ 10</span></div>
+    </div>
+    <div class="metric" id="mStatusCard">
+      <div class="metric-label">ESTADO</div>
+      <div class="metric-value" id="mStatus" style="font-size:14px;line-height:2">AGUARDANDO</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Left: Config + Controls -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- Config panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">PARÂMETROS DE CORTE</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text3)" id="recipeActive"></span>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <div class="field-label">COMPRIMENTO (metros)</div>
+            <div class="stepper">
+              <button class="stepper-btn" onclick="adjustLen(-0.1)">−</button>
+              <input class="stepper-val" type="number" id="lenInput" value="1.50" min="0.1" max="50" step="0.1" oninput="onLenChange()"/>
+              <span class="stepper-unit">m</span>
+              <button class="stepper-btn" onclick="adjustLen(+0.1)">+</button>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label">QUANTIDADE (peças)</div>
+            <div class="stepper">
+              <button class="stepper-btn" onclick="adjustQty(-1)">−</button>
+              <input class="stepper-val" type="number" id="qtyInput" value="10" min="1" max="9999" step="1" oninput="onQtyChange()"/>
+              <span class="stepper-unit">pç</span>
+              <button class="stepper-btn" onclick="adjustQty(+1)">+</button>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label">VELOCIDADE DE AVANÇO</div>
+            <div class="slider-row">
+              <input type="range" id="speedSlider" min="1" max="100" value="60" oninput="onSpeedChange(this.value)"/>
+              <span style="font-family:var(--mono);font-size:12px;color:var(--text2);min-width:38px;text-align:right" id="speedVal">60%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">CONTROLE</span></div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:10px;">
+          <button class="btn btn-primary btn-block" id="startBtn" onclick="startMachine()">
+            ▶ INICIAR CORTE
+          </button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <button class="btn btn-stop btn-block" id="pauseBtn" onclick="pauseMachine()" disabled>
+              ⏸ PAUSAR
+            </button>
+            <button class="btn btn-ghost btn-block" onclick="resetMachine()">
+              ↺ ZERAR
+            </button>
+          </div>
+          <div class="divider"></div>
+          <button class="emergency-btn" onclick="emergencyStop()">
+            ⛔ PARADA DE EMERGÊNCIA
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Status + Progress + Log -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- Machine visual -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">VISUALIZAÇÃO DA MÁQUINA</span></div>
+        <div class="panel-body" style="padding:12px;">
+          <div class="machine-viz">
+            <svg viewBox="0 0 380 120" xmlns="http://www.w3.org/2000/svg">
+              <!-- Base -->
+              <rect x="10" y="90" width="360" height="20" rx="4" fill="#1c2330" stroke="rgba(255,255,255,0.07)"/>
+              <!-- Rolo esquerdo (desenrolador) -->
+              <circle cx="55" cy="72" r="30" fill="#141820" stroke="#2a3447" stroke-width="1.5"/>
+              <circle cx="55" cy="72" r="18" fill="#0f1215" stroke="#3a4557" stroke-width="1"/>
+              <circle cx="55" cy="72" r="4" fill="#f5a623"/>
+              <text x="55" y="110" text-anchor="middle" font-family="'Barlow Condensed'" font-size="8" fill="#4a5568">ROLO</text>
+              <!-- Plástico tape -->
+              <g id="tapeGroup">
+                <rect x="85" y="66" width="140" height="12" rx="2" fill="#1a2535" stroke="rgba(255,255,255,0.06)"/>
+                <!-- Stripes on tape -->
+                <line x1="100" y1="66" x2="100" y2="78" stroke="rgba(245,166,35,0.15)" stroke-width="1"/>
+                <line x1="120" y1="66" x2="120" y2="78" stroke="rgba(245,166,35,0.15)" stroke-width="1"/>
+                <line x1="140" y1="66" x2="140" y2="78" stroke="rgba(245,166,35,0.15)" stroke-width="1"/>
+                <line x1="160" y1="66" x2="160" y2="78" stroke="rgba(245,166,35,0.15)" stroke-width="1"/>
+                <line x1="180" y1="66" x2="180" y2="78" stroke="rgba(245,166,35,0.15)" stroke-width="1"/>
+                <line x1="200" y1="66" x2="200" y2="78" stroke="rgba(245,166,35,0.15)" stroke-width="1"/>
+                <line x1="220" y1="66" x2="220" y2="78" stroke="rgba(245,166,35,0.15)" stroke-width="1"/>
+              </g>
+              <!-- Motor (tração) -->
+              <rect x="220" y="54" width="36" height="32" rx="4" fill="#1c2330" stroke="#2e3d52"/>
+              <circle cx="238" cy="70" r="10" fill="#141820" stroke="#3a4557" stroke-width="1.5"/>
+              <circle cx="238" cy="70" r="4" fill="#32d47a" id="motorDot"/>
+              <text x="238" y="108" text-anchor="middle" font-family="'Barlow Condensed'" font-size="8" fill="#4a5568">MOTOR</text>
+              <!-- Sensor -->
+              <rect x="268" y="60" width="22" height="20" rx="3" fill="#1c2330" stroke="#2e3d52"/>
+              <circle cx="279" cy="70" r="5" fill="#4a90e2" opacity="0.6" id="sensorDot"/>
+              <text x="279" y="108" text-anchor="middle" font-family="'Barlow Condensed'" font-size="8" fill="#4a5568">SENSOR</text>
+              <!-- Guilhotina -->
+              <rect x="302" y="52" width="12" height="40" rx="2" fill="#1c2330" stroke="#2e3d52" id="bladeBody"/>
+              <polygon points="302,88 314,88 308,96" fill="#f5a623" id="bladeTip"/>
+              <text x="308" y="108" text-anchor="middle" font-family="'Barlow Condensed'" font-size="8" fill="#4a5568">CORTE</text>
+              <!-- Peça cortada -->
+              <rect x="328" y="66" width="36" height="12" rx="2" fill="#f5a623" opacity="0.3" id="cutPiece"/>
+              <text x="346" y="108" text-anchor="middle" font-family="'Barlow Condensed'" font-size="8" fill="#4a5568">SAÍDA</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">PROGRESSO DO LOTE</span>
+          <span id="progressPct" style="font-family:var(--mono);font-size:12px;color:var(--amber)">0%</span>
+        </div>
+        <div class="panel-body">
+          <div class="progress-wrap" style="margin-bottom:10px;">
+            <div class="progress-bar" id="progressBar" style="width:0%"></div>
+            <span class="progress-label" id="progressLbl">0 / 10</span>
+          </div>
+          <div class="status-big">
+            <div class="status-orb idle" id="statusOrb"></div>
+            <div>
+              <div class="status-text" id="statusText">AGUARDANDO INÍCIO</div>
+              <div class="status-sub" id="statusSub">Configure e pressione INICIAR</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;">
+            <div style="text-align:center;background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:8px;">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:3px;">CORTADAS</div>
+              <div style="font-family:var(--mono);font-size:16px;color:var(--text)" id="doneCnt">0</div>
+            </div>
+            <div style="text-align:center;background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:8px;">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:3px;">RESTAM</div>
+              <div style="font-family:var(--mono);font-size:16px;color:var(--text)" id="remCnt">10</div>
+            </div>
+            <div style="text-align:center;background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:8px;">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:3px;">TEMPO</div>
+              <div style="font-family:var(--mono);font-size:16px;color:var(--text)" id="elapsedTime">00:00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">LOG DO SISTEMA</span>
+          <button class="btn btn-ghost" style="font-size:10px;padding:3px 8px;" onclick="clearLog()">LIMPAR</button>
+        </div>
+        <div class="panel-body" style="padding:10px 14px;">
+          <div class="log-area" id="logArea">
+            <div class="log-entry ok"><span class="ts">[--:--:--] </span><span class="msg">Sistema iniciado</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: DASHBOARD ══════════ -->
+<div id="dash" class="page">
+  <div class="metric-grid" style="margin-bottom:16px;">
+    <div class="metric amber">
+      <div class="metric-label">TOTAL CORTADO</div>
+      <div class="metric-value" id="dTotalM">0.00<span class="metric-unit">m</span></div>
+    </div>
+    <div class="metric green">
+      <div class="metric-label">TOTAL PEÇAS</div>
+      <div class="metric-value" id="dTotalPcs">0<span class="metric-unit">pç</span></div>
+    </div>
+    <div class="metric blue">
+      <div class="metric-label">LOTES CONCLUÍDOS</div>
+      <div class="metric-value" id="dBatches">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">TEMPO ATIVO</div>
+      <div class="metric-value" id="dUptime">00:00<span class="metric-unit"></span></div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">PRODUÇÃO — ÚLTIMOS 7 LOTES</span></div>
+      <div class="panel-body">
+        <div class="bar-chart" id="batchChart">
+          <div class="bar-col"><div class="bar" style="height:20%"></div><div class="bar-lbl">L1</div></div>
+          <div class="bar-col"><div class="bar" style="height:35%"></div><div class="bar-lbl">L2</div></div>
+          <div class="bar-col"><div class="bar" style="height:55%"></div><div class="bar-lbl">L3</div></div>
+          <div class="bar-col"><div class="bar" style="height:40%"></div><div class="bar-lbl">L4</div></div>
+          <div class="bar-col"><div class="bar" style="height:70%"></div><div class="bar-lbl">L5</div></div>
+          <div class="bar-col"><div class="bar" style="height:60%"></div><div class="bar-lbl">L6</div></div>
+          <div class="bar-col active"><div class="bar active" style="height:0%" id="lastBatchBar"></div><div class="bar-lbl">L7</div></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:8px;text-align:center;">Peças por lote</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">SENSORES EM TEMPO REAL</span></div>
+      <div class="panel-body">
+        <div class="sensor-grid">
+          <div class="sensor-item">
+            <span class="sensor-name">ENCODER</span>
+            <span class="sensor-val ok" id="sEncoder">ATIVO</span>
+          </div>
+          <div class="sensor-item">
+            <span class="sensor-name">TAMPA</span>
+            <span class="sensor-val ok" id="sCover">FECHADA</span>
+          </div>
+          <div class="sensor-item">
+            <span class="sensor-name">FIM MATERIAL</span>
+            <span class="sensor-val ok" id="sMaterial">NORMAL</span>
+          </div>
+          <div class="sensor-item">
+            <span class="sensor-name">TRAVAMENTO</span>
+            <span class="sensor-val ok" id="sJam">LIVRE</span>
+          </div>
+          <div class="sensor-item">
+            <span class="sensor-name">PRESENÇA</span>
+            <span class="sensor-val ok" id="sPresence">SEGURO</span>
+          </div>
+          <div class="sensor-item">
+            <span class="sensor-name">TENSÃO</span>
+            <span class="sensor-val ok" id="sVoltage">12.1 V</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel col-span-2">
+      <div class="panel-header"><span class="panel-title">HISTÓRICO DE OPERAÇÕES</span></div>
+      <div class="panel-body" style="padding:0;">
+        <div id="historyList" style="font-family:var(--mono);font-size:11px;">
+          <div style="padding:12px 16px;color:var(--text3);text-align:center;">Nenhuma operação registrada ainda.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: RECEITAS ══════════ -->
+<div id="recipes" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div style="font-family:var(--cond);font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--text2);">RECEITAS SALVAS</div>
+    <button class="btn btn-primary" onclick="saveCurrentRecipe()">+ SALVAR ATUAL</button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;" id="recipeList">
+    <!-- populated by JS -->
+  </div>
+</div>
+
+<!-- ══════════ PAGE: CONFIG ══════════ -->
+<div id="config" class="page">
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">CONEXÃO</span></div>
+      <div class="panel-body">
+        <div class="field">
+          <div class="field-label">TIPO DE CONEXÃO</div>
+          <select class="field-input" id="connType" style="font-size:13px;" onchange="onConnTypeChange()">
+            <option value="bt">Bluetooth (BT)</option>
+            <option value="wifi">Wi-Fi (ESP32)</option>
+            <option value="usb">USB Serial</option>
+          </select>
+        </div>
+        <div class="field" id="wifiField" style="display:none">
+          <div class="field-label">IP DO ESP32</div>
+          <input class="field-input" id="espIP" type="text" placeholder="192.168.1.100" value="192.168.1.100"/>
+        </div>
+        <div class="field" id="btField">
+          <div class="field-label">DISPOSITIVO BLUETOOTH</div>
+          <input class="field-input" id="btName" type="text" placeholder="Nome do dispositivo BT" value="CorteCtrl-01"/>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="connectDevice()">CONECTAR AGORA</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">PARÂMETROS DO MOTOR</span></div>
+      <div class="panel-body">
+        <div class="field">
+          <div class="field-label">CIRCUNFERÊNCIA DO ROLO (mm)</div>
+          <input class="field-input" id="rollCirc" type="number" value="100" step="0.1"/>
+        </div>
+        <div class="field">
+          <div class="field-label">PASSOS POR REVOLUÇÃO</div>
+          <input class="field-input" id="stepsRev" type="number" value="200"/>
+        </div>
+        <div class="field">
+          <div class="field-label">MICROSTEPPING</div>
+          <select class="field-input" style="font-size:13px;">
+            <option>1/16</option><option>1/8</option><option>1/4</option><option>1/2</option><option>1</option>
+          </select>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Inversão de direção</span>
+          <label class="toggle"><input type="checkbox"/><span class="toggle-track"></span></label>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">SISTEMA DE CORTE</span></div>
+      <div class="panel-body">
+        <div class="field">
+          <div class="field-label">TIPO DE ATUADOR</div>
+          <select class="field-input" style="font-size:13px;">
+            <option>Servo Motor (Guilhotina)</option>
+            <option>Solenoide</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">DELAY ANTES DO CORTE (ms)</div>
+          <input class="field-input" type="number" value="1000" step="100"/>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Delay de segurança</span>
+          <label class="toggle"><input type="checkbox" checked/><span class="toggle-track"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Sensor de tampa</span>
+          <label class="toggle"><input type="checkbox" checked/><span class="toggle-track"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Sensor de presença</span>
+          <label class="toggle"><input type="checkbox" checked/><span class="toggle-track"></span></label>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">COMUNICAÇÃO (CÓDIGO ESP32)</span></div>
+      <div class="panel-body">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:8px;">PROTOCOLO JSON — Comando enviado:</div>
+        <div style="background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:12px;font-family:var(--mono);font-size:11px;color:var(--green);line-height:1.7;">
+          {<br>
+          &nbsp;&nbsp;"cmd": "start",<br>
+          &nbsp;&nbsp;"length": <span id="codeLen">1.50</span>,<br>
+          &nbsp;&nbsp;"qty": <span id="codeQty">10</span>,<br>
+          &nbsp;&nbsp;"speed": <span id="codeSpeed">60</span><br>
+          }
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:12px;">Comandos: start | stop | pause | reset | emergency</div>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+
+<!-- Connection Modal -->
+<div class="modal-backdrop hidden" id="connModal">
+  <div class="modal">
+    <div class="modal-title">CONECTAR DISPOSITIVO</div>
+    <div class="field">
+      <div class="field-label">TIPO</div>
+      <select class="field-input" style="font-size:13px;">
+        <option>Bluetooth</option><option>Wi-Fi</option><option>USB</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-primary" style="flex:1" onclick="connectDevice()">CONECTAR</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="closeConnModal()">CANCELAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ── State ──────────────────────────────────────────
+const state = {
+  connected: false,
+  running: false,
+  paused: false,
+  done: 0,
+  qty: 10,
+  len: 1.50,
+  speed: 60,
+  startTime: null,
+  timerInterval: null,
+  cutInterval: null,
+  totalMeters: 0,
+  totalPieces: 0,
+  batches: 0,
+  uptimeStart: Date.now(),
+  uptimeInterval: null
+};
+
+const recipes = [
+  { name: 'Bobina Padrão', len: 1.50, qty: 100, speed: 60 },
+  { name: 'Corte Longo', len: 3.00, qty: 50, speed: 40 },
+  { name: 'Mini Tiras', len: 0.30, qty: 500, speed: 80 },
+];
+
+// ── Uptime counter ──
+state.uptimeInterval = setInterval(() => {
+  const s = Math.floor((Date.now() - state.uptimeStart) / 1000);
+  const m = Math.floor(s / 60), sec = s % 60;
+  document.getElementById('dUptime').innerHTML =
+    `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}, 1000);
+
+// ── Page navigation ──
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Input handlers ──
+function onLenChange() {
+  const v = parseFloat(document.getElementById('lenInput').value) || 1.5;
+  state.len = Math.round(v * 100) / 100;
+  document.getElementById('mLen').innerHTML = state.len.toFixed(2) + '<span class="metric-unit">m</span>';
+  document.getElementById('codeLen').textContent = state.len.toFixed(2);
+}
+function onQtyChange() {
+  const v = parseInt(document.getElementById('qtyInput').value) || 10;
+  state.qty = Math.max(1, v);
+  document.getElementById('mQty').innerHTML = state.qty + '<span class="metric-unit">pç</span>';
+  document.getElementById('mProg').innerHTML = state.done + '<span class="metric-unit">/ ' + state.qty + '</span>';
+  document.getElementById('remCnt').textContent = state.qty - state.done;
+  document.getElementById('progressLbl').textContent = state.done + ' / ' + state.qty;
+  document.getElementById('codeQty').textContent = state.qty;
+}
+function onSpeedChange(v) {
+  state.speed = parseInt(v);
+  document.getElementById('speedVal').textContent = v + '%';
+  document.getElementById('codeSpeed').textContent = v;
+}
+function adjustLen(delta) {
+  const inp = document.getElementById('lenInput');
+  let v = Math.round((parseFloat(inp.value) + delta) * 100) / 100;
+  v = Math.max(0.1, Math.min(50, v));
+  inp.value = v.toFixed(2);
+  onLenChange();
+}
+function adjustQty(delta) {
+  const inp = document.getElementById('qtyInput');
+  let v = parseInt(inp.value) + delta;
+  v = Math.max(1, Math.min(9999, v));
+  inp.value = v;
+  onQtyChange();
+}
+
+// ── Machine control ──
+function startMachine() {
+  if (state.running && !state.paused) return;
+  if (state.paused) {
+    state.paused = false;
+    resumeCutting();
+    return;
+  }
+  state.done = 0;
+  state.running = true;
+  state.paused = false;
+  state.startTime = Date.now();
+  updateStatus('running', 'EM OPERAÇÃO', 'Avançando material...');
+  document.getElementById('startBtn').textContent = '▶ EM ANDAMENTO...';
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('pauseBtn').disabled = false;
+  log('ok', 'Corte iniciado — ' + state.qty + ' pç × ' + state.len.toFixed(2) + ' m');
+  simulateCutting();
+  startTimer();
+}
+function simulateCutting() {
+  const speed = Math.max(1, 100 - state.speed + 10);
+  const interval = speed * 30 + 400;
+  state.cutInterval = setInterval(() => {
+    if (state.paused) return;
+    state.done++;
+    updateProgress();
+    if (state.done < state.qty) {
+      log('', '✂ Peça ' + state.done + ' cortada — ' + state.len.toFixed(2) + ' m');
+      animateCut();
+    }
+    if (state.done >= state.qty) {
+      clearInterval(state.cutInterval);
+      clearInterval(state.timerInterval);
+      finishBatch();
+    }
+  }, interval);
+}
+function resumeCutting() {
+  updateStatus('running', 'RETOMADO', 'Avançando material...');
+  log('warn', 'Operação retomada');
+  simulateCutting();
+}
+function pauseMachine() {
+  if (!state.running) return;
+  if (state.paused) { startMachine(); return; }
+  state.paused = true;
+  clearInterval(state.cutInterval);
+  updateStatus('stopped', 'PAUSADO', 'Pressione INICIAR para retomar');
+  document.getElementById('pauseBtn').textContent = '▶ RETOMAR';
+  document.getElementById('startBtn').textContent = '▶ RETOMAR';
+  document.getElementById('startBtn').disabled = false;
+  log('warn', 'Operação pausada em ' + state.done + ' peças');
+}
+function resetMachine() {
+  clearInterval(state.cutInterval);
+  clearInterval(state.timerInterval);
+  state.running = false; state.paused = false; state.done = 0;
+  updateProgress();
+  updateStatus('idle', 'AGUARDANDO INÍCIO', 'Configure e pressione INICIAR');
+  document.getElementById('startBtn').textContent = '▶ INICIAR CORTE';
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('pauseBtn').textContent = '⏸ PAUSAR';
+  document.getElementById('pauseBtn').disabled = true;
+  document.getElementById('elapsedTime').textContent = '00:00';
+  log('', 'Sistema zerado');
+}
+function emergencyStop() {
+  clearInterval(state.cutInterval);
+  clearInterval(state.timerInterval);
+  state.running = false; state.paused = false;
+  updateStatus('stopped', '⛔ PARADA EMERGÊNCIA', 'Desligue a máquina antes de continuar');
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('pauseBtn').disabled = true;
+  log('err', 'PARADA DE EMERGÊNCIA ATIVADA');
+  showToast('⛔ Emergência ativada!', 'err');
+  setTimeout(() => {
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('startBtn').textContent = '▶ INICIAR CORTE';
+  }, 3000);
+}
+function finishBatch() {
+  state.running = false;
+  const total = state.qty * state.len;
+  state.totalMeters = Math.round((state.totalMeters + total) * 100) / 100;
+  state.totalPieces += state.qty;
+  state.batches++;
+  updateStatus('done', 'LOTE CONCLUÍDO ✓', state.qty + ' peças × ' + state.len.toFixed(2) + ' m');
+  document.getElementById('startBtn').textContent = '▶ INICIAR CORTE';
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('pauseBtn').disabled = true;
+  document.getElementById('pauseBtn').textContent = '⏸ PAUSAR';
+  log('ok', 'Lote concluído — ' + total.toFixed(2) + ' m total');
+  showToast('Lote concluído! ' + state.qty + ' peças ✓', 'ok');
+  updateDashboard();
+  addHistoryRow();
+  updateLastBatchBar();
+}
+function animateCut() {
+  const blade = document.getElementById('bladeBody');
+  const tip = document.getElementById('bladeTip');
+  const piece = document.getElementById('cutPiece');
+  blade.setAttribute('y', '58');
+  tip.setAttribute('points', '302,94 314,94 308,102');
+  piece.setAttribute('opacity', '0.8');
+  setTimeout(() => {
+    blade.setAttribute('y', '52');
+    tip.setAttribute('points', '302,88 314,88 308,96');
+    piece.setAttribute('opacity', '0.3');
+  }, 250);
+}
+
+// ── Timer ──
+function startTimer() {
+  clearInterval(state.timerInterval);
+  state.timerInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+    const m = Math.floor(elapsed / 60), s = elapsed % 60;
+    document.getElementById('elapsedTime').textContent =
+      String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  }, 1000);
+}
+
+// ── UI updates ──
+function updateProgress() {
+  const pct = Math.round((state.done / state.qty) * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressLbl').textContent = state.done + ' / ' + state.qty;
+  document.getElementById('mProg').innerHTML = state.done + '<span class="metric-unit">/ ' + state.qty + '</span>';
+  document.getElementById('doneCnt').textContent = state.done;
+  document.getElementById('remCnt').textContent = state.qty - state.done;
+}
+function updateStatus(type, text, sub) {
+  const orb = document.getElementById('statusOrb');
+  orb.className = 'status-orb ' + type;
+  document.getElementById('statusText').textContent = text;
+  document.getElementById('statusSub').textContent = sub;
+  const labels = { idle: 'AGUARDANDO', running: 'EM OPERAÇÃO', stopped: 'PARADO', done: 'CONCLUÍDO' };
+  document.getElementById('mStatus').textContent = labels[type] || text.substring(0,12);
+}
+function updateDashboard() {
+  document.getElementById('dTotalM').innerHTML = state.totalMeters.toFixed(2) + '<span class="metric-unit">m</span>';
+  document.getElementById('dTotalPcs').innerHTML = state.totalPieces + '<span class="metric-unit">pç</span>';
+  document.getElementById('dBatches').textContent = state.batches;
+}
+function updateLastBatchBar() {
+  const pct = Math.min(100, Math.round((state.qty / 200) * 100));
+  document.getElementById('lastBatchBar').style.height = pct + '%';
+}
+function addHistoryRow() {
+  const list = document.getElementById('historyList');
+  const placeholder = list.querySelector('[style*="text-align:center"]');
+  if (placeholder) placeholder.remove();
+  const now = new Date();
+  const ts = now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2);';
+  row.innerHTML = `<span style="color:var(--text3)">${ts}</span><span>${state.qty} pç × ${state.len.toFixed(2)} m</span><span style="color:var(--green)">✓ ${(state.qty*state.len).toFixed(2)} m</span><span style="color:var(--text3)">vel: ${state.speed}%</span>`;
+  list.insertBefore(row, list.firstChild);
+}
+
+// ── Log ──
+function log(type, msg) {
+  const area = document.getElementById('logArea');
+  const now = new Date();
+  const ts = now.toLocaleTimeString('pt-BR');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry ' + (type || '');
+  entry.innerHTML = `<span class="ts">[${ts}] </span><span class="msg">${msg}</span>`;
+  area.insertBefore(entry, area.firstChild);
+  if (area.children.length > 50) area.removeChild(area.lastChild);
+}
+function clearLog() {
+  document.getElementById('logArea').innerHTML = '';
+  log('', 'Log limpo pelo usuário');
+}
+
+// ── Toast ──
+function showToast(msg, type) {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type || '');
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ── Connection ──
+function openConnModal() { document.getElementById('connModal').classList.remove('hidden'); }
+function closeConnModal() { document.getElementById('connModal').classList.add('hidden'); }
+function connectDevice() {
+  closeConnModal();
+  setTimeout(() => {
+    state.connected = true;
+    const pill = document.getElementById('connStatus');
+    pill.className = 'status-pill online';
+    document.getElementById('connLabel').textContent = 'ONLINE';
+    log('ok', 'Dispositivo conectado via ' + (document.getElementById('connType') ? document.getElementById('connType').value.toUpperCase() : 'BT'));
+    showToast('Dispositivo conectado!', 'ok');
+  }, 1200);
+}
+function onConnTypeChange() {
+  const v = document.getElementById('connType').value;
+  document.getElementById('wifiField').style.display = v === 'wifi' ? 'block' : 'none';
+  document.getElementById('btField').style.display = v === 'bt' ? 'block' : 'none';
+}
+
+// ── Recipes ──
+function renderRecipes() {
+  const list = document.getElementById('recipeList');
+  list.innerHTML = '';
+  recipes.forEach((r, i) => {
+    const card = document.createElement('div');
+    card.className = 'recipe-card';
+    card.innerHTML = `
+      <div>
+        <div class="recipe-name">${r.name}</div>
+        <div class="recipe-meta">${r.qty} pç × ${r.len.toFixed(2)} m — vel: ${r.speed}%</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="recipe-badge">${(r.qty * r.len).toFixed(1)} m total</span>
+        <button class="btn btn-ghost" style="font-size:11px;padding:5px 12px;" onclick="loadRecipe(${i})">CARREGAR</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;color:var(--red);border-color:var(--red-dim);" onclick="deleteRecipe(${i})">✕</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+function loadRecipe(i) {
+  const r = recipes[i];
+  document.getElementById('lenInput').value = r.len.toFixed(2);
+  document.getElementById('qtyInput').value = r.qty;
+  document.getElementById('speedSlider').value = r.speed;
+  onLenChange(); onQtyChange(); onSpeedChange(r.speed);
+  document.getElementById('recipeActive').textContent = r.name;
+  showToast('Receita carregada: ' + r.name, 'ok');
+  showPage('ctrl', document.querySelector('.nav-tab'));
+  document.querySelectorAll('.nav-tab')[0].classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach((t,j) => j !== 0 && t.classList.remove('active'));
+}
+function deleteRecipe(i) {
+  recipes.splice(i, 1);
+  renderRecipes();
+  showToast('Receita removida', '');
+}
+function saveCurrentRecipe() {
+  const name = prompt('Nome da receita:');
+  if (!name) return;
+  recipes.push({ name, len: state.len, qty: state.qty, speed: state.speed });
+  renderRecipes();
+  showToast('Receita salva: ' + name, 'ok');
+}
+renderRecipes();
+
+// ── Sensor simulation (occasional flicker) ──
+setInterval(() => {
+  if (!state.running) return;
+  const v = document.getElementById('sVoltage');
+  const volt = (11.8 + Math.random() * 0.6).toFixed(1);
+  v.textContent = volt + ' V';
+  v.className = 'sensor-val ' + (parseFloat(volt) > 11.5 ? 'ok' : 'warn');
+}, 2000);
+</script>
+</body>
+</html>
